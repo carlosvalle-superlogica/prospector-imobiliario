@@ -24,7 +24,7 @@ const formatarCnpjVisual = (cnpjLimpo) => {
 
 const formatarNome = (nome) => {
   if (!nome) return "";
-  return nome.split(' ').map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase()).join(' ');
+  return nome.split(' ').map(palavra => palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase()).join(' ');
 };
 
 const formatarTelefone = (ddd, tel) => {
@@ -37,8 +37,9 @@ const formatarTelefone = (ddd, tel) => {
 
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
   await new Promise(resolve => setTimeout(resolve, 800)); 
+  // CORRIGIDO: Agora usando a variável correta 'quantidade'
   const listaEstado = BASE_REAL_EMPRESAS[estado] || BASE_REAL_EMPRESAS["RJ"];
-  return listaEstado.slice(0, quantity).map(empresa => ({
+  return listaEstado.slice(0, quantidade).map(empresa => ({
     ...empresa,
     cidade: cidade ? cidade.trim() : "Região"
   }));
@@ -56,7 +57,7 @@ export async function enriquecerDadosComIA(empresa) {
 
   if (cnpjLimpo.length === 14) {
     try {
-      // 🔥 ALTERAÇÃO: Passando o CNPJ E o SITE para o nosso servidor fazer o cruzamento
+      // Passando o CNPJ E o SITE para o nosso servidor fazer o cruzamento
       const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}&site=${encodeURIComponent(empresa.site)}`);
       
       if (resposta.ok) {
@@ -108,7 +109,7 @@ export async function enriquecerDadosComIA(empresa) {
     phone: telefonesFinais,
     socios: sociosReais,
     cargo_decisor: cargoDecisor, 
-    stack_tecnologico: stackTecnico, // Adiciona o resultado técnico final para a tabela
+    stack_tecnologico: stackTecnico,
     score_potencial: score,
     justificativa_score: justificativa,
     emails_provaveis: emailsDeduzidos,
