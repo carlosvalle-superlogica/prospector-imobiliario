@@ -1,6 +1,6 @@
 /**
  * SERVIÇO DE CONEXÃO E TRIANGULAÇÃO DE DADOS REAIS
- * Utilizando a API Pública CNPJ.ws (Mais rápida, estável e sem bloqueio de IPs)
+ * Envia o CNPJ e o Site para o nosso Backend analisar a tecnologia!
  */
 
 const BASE_REAL_EMPRESAS = {
@@ -16,37 +16,29 @@ const BASE_REAL_EMPRESAS = {
   ]
 };
 
-// FORMATAÇÃO DE CNPJ (XX.XXX.XXX/XXXX-XX)
 const formatarCnpjVisual = (cnpjLimpo) => {
   const c = String(cnpjLimpo).replace(/\D/g, '');
   if (c.length === 14) return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
   return cnpjLimpo;
 };
 
-// TRATAMENTO DE TEXTO (Arruma nomes da Receita que vêm em CAIXA ALTA)
 const formatarNome = (nome) => {
   if (!nome) return "";
   return nome.split(' ').map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase()).join(' ');
 };
 
-// FORMATAÇÃO DE TELEFONE (Monta o DDD junto com o número)
 const formatarTelefone = (ddd, tel) => {
   if (!ddd || !tel) return null;
   const limpo = String(tel).replace(/\D/g, '');
-  
-  if (limpo.length === 8) {
-    return `(${ddd}) ${limpo.slice(0,4)}-${limpo.slice(4)}`; // Fixo
-  } else if (limpo.length === 9) {
-    return `📱 (${ddd}) ${limpo.slice(0,5)}-${limpo.slice(5)}`; // Celular
-  }
+  if (limpo.length === 8) return `Hex: (${ddd}) ${limpo.slice(0,4)}-${limpo.slice(4)}`;
+  if (limpo.length === 9) return `📱 (${ddd}) ${limpo.slice(0,5)}-${limpo.slice(5)}`;
   return `(${ddd}) ${limpo}`;
 };
 
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
   await new Promise(resolve => setTimeout(resolve, 800)); 
   const listaEstado = BASE_REAL_EMPRESAS[estado] || BASE_REAL_EMPRESAS["RJ"];
-  
-  return listaEstado.slice(0, quantidade).map(empresa => ({
+  return listaEstado.slice(0, quantity).map(empresa => ({
     ...empresa,
     cidade: cidade ? cidade.trim() : "Região"
   }));
@@ -56,63 +48,49 @@ export async function enriquecerDadosComIA(empresa) {
   let cnpjLimpo = empresa.cnpj ? String(empresa.cnpj).replace(/\D/g, '') : "";
   let cnpjFormatado = formatarCnpjVisual(cnpjLimpo);
   
-  // Nossas variáveis de segurança (Fallback)
   let sociosReais = ["Diretor de Operações"]; 
   let cargoDecisor = "Cargo Omitido";
   let telefonesFinais = "(00) 0000-0000"; 
+  let stackTecnico = "Analisando...";
   let score = empresa.porte === "Grande" ? 10 : 8; 
 
   if (cnpjLimpo.length === 14) {
     try {
-      // 🔥 MUDANÇA AQUI: Conectando direto na API Aberta da CNPJ.ws 
-      const resposta = await fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`);
+      // 🔥 ALTERAÇÃO: Passando o CNPJ E o SITE para o nosso servidor fazer o cruzamento
+      const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}&site=${encodeURIComponent(empresa.site)}`);
       
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
         
-        // 1. EXTRAÇÃO DOS SÓCIOS E CARGOS
+        // Puxa as tecnologias que o nosso robô detectou no site
+        stackTecnico = dadosCnpj.stack_tecnologico || "Apenas tecnologias básicas";
+
         if (dadosCnpj.socios && dadosCnpj.socios.length > 0) {
           sociosReais = dadosCnpj.socios.map(socio => formatarNome(socio.nome));
-          // O ponto de interrogação (?) previne que o código quebre se o cargo não existir
           cargoDecisor = formatarNome(dadosCnpj.socios[0].qualificacao_socio?.descricao) || "Sócio";
         } else if (dadosCnpj.razao_social) {
           sociosReais = [formatarNome(dadosCnpj.razao_social)];
           cargoDecisor = "Proprietário / Titular";
         }
 
-        // 2. EXTRAÇÃO DOS TELEFONES
         let listaTels = [];
         const estab = dadosCnpj.estabelecimento;
-        
         if (estab) {
           const tel1 = formatarTelefone(estab.ddd1, estab.telefone1);
           const tel2 = formatarTelefone(estab.ddd2, estab.telefone2);
-          
           if (tel1) listaTels.push(tel1);
           if (tel2 && tel2 !== tel1) listaTels.push(tel2);
         }
-
-        if (listaTels.length > 0) {
-          telefonesFinais = listaTels.join(' / ');
-        } else {
-          telefonesFinais = "Não cadastrado";
-          score -= 1; 
-        }
-
-      } else {
-        console.warn(`Aviso: Falha ao buscar dados do CNPJ: ${cnpjFormatado}`);
+        if (listaTels.length > 0) telefonesFinais = listaTels.join(' / ');
       }
     } catch (erro) {
-      console.error("Erro ao comunicar com a CNPJ.ws:", erro);
+      console.error("Erro ao comunicar com o Backend:", erro);
+      stackTecnico = "Falha no mapeamento técnico";
     }
-  } else {
-    cnpjFormatado = "⚠️ CNPJ Incompleto";
-    score = 2;
   }
 
   const justificativa = "Empresa validada. Foco em automação de repasses.";
 
-  // Geração probabilística de e-mails
   const emailsDeduzidos = sociosReais.map(socio => {
     if (socio === "Diretor de Operações" || socio === "Diretoria") return `diretoria@${empresa.site}`;
     const nomeLimpo = socio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -130,6 +108,7 @@ export async function enriquecerDadosComIA(empresa) {
     phone: telefonesFinais,
     socios: sociosReais,
     cargo_decisor: cargoDecisor, 
+    stack_tecnologico: stackTecnico, // Adiciona o resultado técnico final para a tabela
     score_potencial: score,
     justificativa_score: justificativa,
     emails_provaveis: emailsDeduzidos,
