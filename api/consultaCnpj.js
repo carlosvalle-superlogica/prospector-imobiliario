@@ -67,7 +67,8 @@ export default async function handler(request, response) {
       stack_tecnologico: stackTecnologico
     };
 
-    return response.status(200).json(dadosEnriched);
+    // CORRIGIDO: Agora batendo o nome correto da variável!
+    return response.status(200).json(dadosEnriquecidos);
     
   } catch (error) {
     return response.status(500).json({ error: "Erro interno no servidor da Vercel." });
