@@ -1,20 +1,7 @@
 /**
  * SERVIÇO DE CONEXÃO E TRIANGULAÇÃO DE DADOS REAIS
- * Consolida as 3 camadas de inteligência: Stack, Maturidade e Dados Fiscais Oficiais.
+ * 100% Dinâmico: Busca por CNAE Imobiliário via Backend próprio.
  */
-
-const BASE_REAL_EMPRESAS = {
-  "RJ": [
-    { name: "APSA Gestão Condominial", site: "apsa.com.br", cnpj: "28350338000192", porte: "Grande" },
-    { name: "Julio Bogoricin Imóveis", site: "juliobogoricin.com", cnpj: "27261874000159", porte: "Grande" },
-    { name: "Sergio Castro Imóveis", site: "sergiocastro.com.br", cnpj: "33179797000195", porte: "Grande" },
-    { name: "Estasa Administradora", site: "estasa.com.br", cnpj: "42181669000177", porte: "Grande" }
-  ],
-  "SP": [
-    { name: "Lopes Imobiliária", site: "lopes.com.br", cnpj: "61322844000102", porte: "Grande" },
-    { name: "Lello Condomínios e Aluguel", site: "lellocondominios.com.br", cnpj: "52411933000199", porte: "Grande" }
-  ]
-};
 
 const formatarCnpjVisual = (cnpjLimpo) => {
   const c = String(cnpjLimpo).replace(/\D/g, '');
@@ -35,7 +22,6 @@ const formatarTelefone = (ddd, tel) => {
   return `(${ddd}) ${limpo}`;
 };
 
-// CALCULA A IDADE COM BASE NA DATA DO CONTRATO SOCIAL DA RECEITA FEDERAL
 const calcularIdadeEmpresa = (dataAberturaString) => {
   if (!dataAberturaString) return "Idade não mapeada";
   try {
@@ -51,7 +37,6 @@ const calcularIdadeEmpresa = (dataAberturaString) => {
   }
 };
 
-// INTEGRAÇÃO DE ABORDAGEM SDR DINÂMICA CONFORME O CARGO DETECTADO
 const gerarScriptComercialDinamico = (nomeSocio, cargo, cidade) => {
   const socio = nomeSocio || "Responsável";
   const local = cidade || "sua região";
@@ -62,13 +47,18 @@ const gerarScriptComercialDinamico = (nomeSocio, cargo, cidade) => {
   return `Olá, boa tarde! O ${socio} encontra-se? É sobre uma otimização no fluxo operacional de repasses de alugueres e redução de custos operacionais na carteira de imóveis em ${local}. Conseguia transferir-me para a sala dele ou confirmar o e-mail direto?`;
 };
 
+// 🔥 MUDANÇA AQUI: Agora ele vai na nova API de CNAE buscar empresas reais!
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
-  await new Promise(resolve => setTimeout(resolve, 800)); 
-  const listaEstado = BASE_REAL_EMPRESAS[estado] || BASE_REAL_EMPRESAS["RJ"];
-  return listaEstado.slice(0, quantidade).map(empresa => ({
-    ...empresa,
-    cidade: cidade ? cidade.trim() : "Região"
-  }));
+  try {
+    const resposta = await fetch(`/api/buscarCnae?cidade=${encodeURIComponent(cidade)}&estado=${encodeURIComponent(estado)}&quantidade=${quantidade}`);
+    if (resposta.ok) {
+      const empresasReais = await resposta.json();
+      return empresasReais;
+    }
+  } catch (erro) {
+    console.error("Erro ao buscar empresas reais por CNAE:", erro);
+  }
+  return [];
 }
 
 export async function enriquecerDadosComIA(empresa) {
@@ -91,19 +81,14 @@ export async function enriquecerDadosComIA(empresa) {
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
         
-        // 1. Captura as tecnologias encontradas no site
         stackTecnico = dadosCnpj.stack_tecnologico || "Tecnologias Básicas";
-
-        // 2. Captura e processa a maturidade/idade fiscal da empresa
         const dataAberturaRaw = dadosCnpj.estabelecimento?.data_inicio_atividade;
         dadosMaturidade = calcularIdadeEmpresa(dataAberturaRaw);
 
-        // 3. Captura o E-mail Oficial Corporativo cadastrado na Receita Federal
         if (dadosCnpj.estabelecimento?.email) {
           emailOficialReceita = dadosCnpj.estabelecimento.email.toLowerCase();
         }
 
-        // Quadro de Sócios e Cargos Reais
         if (dadosCnpj.socios && dadosCnpj.socios.length > 0) {
           sociosReais = dadosCnpj.socios.map(socio => formatarNome(socio.nome));
           cargoDecisor = formatarNome(dadosCnpj.socios[0].qualificacao_socio?.descricao) || "Sócio";
@@ -112,7 +97,6 @@ export async function enriquecerDadosComIA(empresa) {
           cargoDecisor = "Proprietário / Titular";
         }
 
-        // Telefones Oficiais da Base Governamental
         let listaTels = [];
         const estab = dadosCnpj.estabelecimento;
         if (estab) {
@@ -132,7 +116,6 @@ export async function enriquecerDadosComIA(empresa) {
 
   const justificativa = "Empresa validada e enriquecida com cruzamento de dados fiscais.";
 
-  // Geração probabilística do e-mail do tomador de decisão (@site)
   const emailsDeduzidos = sociosReais.map(socio => {
     if (socio === "Diretor de Operações" || socio === "Diretoria") return `diretoria@${empresa.site}`;
     const nomeLimpo = socio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -142,8 +125,6 @@ export async function enriquecerDadosComIA(empresa) {
   });
 
   const principalSocio = sociosReais[0] || "Diretor Responsável";
-  
-  // Geração inteligente de script comercial baseado no cargo real
   const scriptSdr = gerarScriptComercialDinamico(principalSocio, cargoDecisor, empresa.cidade);
 
   return {
