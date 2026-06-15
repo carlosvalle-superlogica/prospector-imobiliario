@@ -163,7 +163,7 @@ export default function App() {
               <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-bold text-gray-800">📋 Listagem Estruturada de Prospecção</h3>
                 <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-100">
-                  Cruzamento: Google Maps + Receita Federal
+                  Cruzamento: Google Maps + Receita Federal + Análise de Site
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -196,9 +196,8 @@ export default function App() {
                           <div className="font-semibold text-gray-800">{(lead.socios && lead.socios[0]) || 'Diretoria'}</div>
                           <div className="text-xs text-gray-400 font-medium">Cargo: {lead.cargo_decisor || 'Não informado'}</div>
                         </td>
-                        {/* NOVA COLUNA: Exibe os sistemas encontrados pelo robô de varredura */}
                         <td className="p-4">
-                          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100/50 block w-fit max-w-[200px] truncate" title={lead.stack_tecnologico}>
+                          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/60 px-2.5 py-1.5 rounded border border-indigo-100/50 block w-fit max-w-[200px]">
                             {lead.stack_tecnologico || 'Analisando...'}
                           </span>
                         </td>
