@@ -1,7 +1,6 @@
 /**
  * SERVIÇO DE CONEXÃO E TRIANGULAÇÃO DE DADOS REAIS
- * Utiliza o nosso Backend Próprio (Serverless na Vercel).
- * Agora extrai Telefones oficiais e Cargos Reais do Governo!
+ * Utilizando a API Pública CNPJ.ws (Mais rápida, estável e sem bloqueio de IPs)
  */
 
 const BASE_REAL_EMPRESAS = {
@@ -30,17 +29,17 @@ const formatarNome = (nome) => {
   return nome.split(' ').map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase()).join(' ');
 };
 
-// FORMATAÇÃO DE TELEFONE (Identifica se é fixo ou celular automaticamente)
-const formatarTelefone = (telString) => {
-  if (!telString) return null;
-  const limpo = String(telString).replace(/\D/g, ''); // Tira espaços e letras
+// FORMATAÇÃO DE TELEFONE (Monta o DDD junto com o número)
+const formatarTelefone = (ddd, tel) => {
+  if (!ddd || !tel) return null;
+  const limpo = String(tel).replace(/\D/g, '');
   
-  if (limpo.length === 10) {
-    return `(${limpo.slice(0,2)}) ${limpo.slice(2,6)}-${limpo.slice(6)}`; // Fixo: (XX) XXXX-XXXX
-  } else if (limpo.length === 11) {
-    return `📱 (${limpo.slice(0,2)}) ${limpo.slice(2,7)}-${limpo.slice(7)}`; // Celular: 📱 (XX) XXXXX-XXXX
+  if (limpo.length === 8) {
+    return `(${ddd}) ${limpo.slice(0,4)}-${limpo.slice(4)}`; // Fixo
+  } else if (limpo.length === 9) {
+    return `📱 (${ddd}) ${limpo.slice(0,5)}-${limpo.slice(5)}`; // Celular
   }
-  return telString; 
+  return `(${ddd}) ${limpo}`;
 };
 
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
@@ -57,7 +56,7 @@ export async function enriquecerDadosComIA(empresa) {
   let cnpjLimpo = empresa.cnpj ? String(empresa.cnpj).replace(/\D/g, '') : "";
   let cnpjFormatado = formatarCnpjVisual(cnpjLimpo);
   
-  // Variáveis que vamos preencher com dados reais do Governo
+  // Nossas variáveis de segurança (Fallback)
   let sociosReais = ["Diretor de Operações"]; 
   let cargoDecisor = "Cargo Omitido";
   let telefonesFinais = "(00) 0000-0000"; 
@@ -65,43 +64,46 @@ export async function enriquecerDadosComIA(empresa) {
 
   if (cnpjLimpo.length === 14) {
     try {
-      const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}`);
+      // 🔥 MUDANÇA AQUI: Conectando direto na API Aberta da CNPJ.ws 
+      const resposta = await fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`);
       
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
         
-        // 1. EXTRAÇÃO DO QUADRO DE SÓCIOS E CARGOS
-        if (dadosCnpj.qsa && dadosCnpj.qsa.length > 0) {
-          // Pega o primeiro sócio da lista e guarda o nome dele
-          sociosReais = dadosCnpj.qsa.map(socio => formatarNome(socio.nome_socio || socio.nome));
-          // Salva o cargo oficial dele (Ex: Sócio-Administrador, Presidente, etc)
-          cargoDecisor = formatarNome(dadosCnpj.qsa[0].qualificacao_socio) || "Sócio";
+        // 1. EXTRAÇÃO DOS SÓCIOS E CARGOS
+        if (dadosCnpj.socios && dadosCnpj.socios.length > 0) {
+          sociosReais = dadosCnpj.socios.map(socio => formatarNome(socio.nome));
+          // O ponto de interrogação (?) previne que o código quebre se o cargo não existir
+          cargoDecisor = formatarNome(dadosCnpj.socios[0].qualificacao_socio?.descricao) || "Sócio";
         } else if (dadosCnpj.razao_social) {
           sociosReais = [formatarNome(dadosCnpj.razao_social)];
           cargoDecisor = "Proprietário / Titular";
         }
 
-        // 2. EXTRAÇÃO DOS TELEFONES (Fixo e Celular)
+        // 2. EXTRAÇÃO DOS TELEFONES
         let listaTels = [];
-        const tel1 = formatarTelefone(dadosCnpj.ddd_telefone_1);
-        const tel2 = formatarTelefone(dadosCnpj.ddd_telefone_2);
+        const estab = dadosCnpj.estabelecimento;
         
-        if (tel1) listaTels.push(tel1);
-        // Só adiciona o telefone 2 se for diferente do telefone 1
-        if (tel2 && tel2 !== tel1) listaTels.push(tel2);
+        if (estab) {
+          const tel1 = formatarTelefone(estab.ddd1, estab.telefone1);
+          const tel2 = formatarTelefone(estab.ddd2, estab.telefone2);
+          
+          if (tel1) listaTels.push(tel1);
+          if (tel2 && tel2 !== tel1) listaTels.push(tel2);
+        }
 
         if (listaTels.length > 0) {
           telefonesFinais = listaTels.join(' / ');
         } else {
-          telefonesFinais = "Não cadastrado na Receita";
-          score -= 1; // Punição leve se não tiver telefone
+          telefonesFinais = "Não cadastrado";
+          score -= 1; 
         }
 
       } else {
         console.warn(`Aviso: Falha ao buscar dados do CNPJ: ${cnpjFormatado}`);
       }
     } catch (erro) {
-      console.error("Erro no nosso Backend:", erro);
+      console.error("Erro ao comunicar com a CNPJ.ws:", erro);
     }
   } else {
     cnpjFormatado = "⚠️ CNPJ Incompleto";
@@ -110,7 +112,7 @@ export async function enriquecerDadosComIA(empresa) {
 
   const justificativa = "Empresa validada. Foco em automação de repasses.";
 
-  // Geração de e-mails
+  // Geração probabilística de e-mails
   const emailsDeduzidos = sociosReais.map(socio => {
     if (socio === "Diretor de Operações" || socio === "Diretoria") return `diretoria@${empresa.site}`;
     const nomeLimpo = socio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -125,9 +127,9 @@ export async function enriquecerDadosComIA(empresa) {
   return {
     ...empresa,
     cnpj: cnpjFormatado, 
-    phone: telefonesFinais, // Agora envia o telefone que veio do governo!
+    phone: telefonesFinais,
     socios: sociosReais,
-    cargo_decisor: cargoDecisor, // Envia o cargo real
+    cargo_decisor: cargoDecisor, 
     score_potencial: score,
     justificativa_score: justificativa,
     emails_provaveis: emailsDeduzidos,
