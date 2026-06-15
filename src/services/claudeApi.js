@@ -1,6 +1,6 @@
 /**
  * SERVIÇO DE CONEXÃO E TRIANGULAÇÃO DE DADOS REAIS
- * Consulta bases públicas oficiais. Sistema com "Fallback Seguro" para evitar bloqueios.
+ * Utiliza o nosso Backend Próprio (Serverless na Vercel) para evitar bloqueios de CORS.
  */
 
 const BASE_REAL_EMPRESAS = {
@@ -39,15 +39,14 @@ export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
 
 export async function enriquecerDadosComIA(empresa) {
   let cnpjLimpo = empresa.cnpj ? String(empresa.cnpj).replace(/\D/g, '') : "";
-  
-  // 1. GARANTIA: O CNPJ verdadeiro já fica formatado e salvo na memória independente da API
   let cnpjFormatado = formatarCnpjVisual(cnpjLimpo);
   let sociosReais = ["Diretor de Operações"]; 
   let score = empresa.porte === "Grande" ? 10 : 8; 
 
   if (cnpjLimpo.length === 14) {
     try {
-      const resposta = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
+      // 🔥 AQUI ESTÁ A MÁGICA: Chamamos o NOSSO servidor, e não mais o Governo diretamente!
+      const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}`);
       
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
@@ -58,11 +57,10 @@ export async function enriquecerDadosComIA(empresa) {
           sociosReais = [formatarNome(dadosCnpj.razao_social)];
         }
       } else {
-        // Se a API barrar, a gente avisa só no log do console, MAS NÃO apaga o CNPJ
-        console.warn(`API ocupada. Mantendo dados salvos em memória para: ${cnpjFormatado}`);
+        console.warn(`Aviso: CNPJ ${cnpjFormatado} não retornou dados. Código: ${resposta.status}`);
       }
     } catch (erro) {
-      console.error("Oscilação de rede. Usando fallback visual para proteger o CNPJ:", erro);
+      console.error("Erro ao conectar no nosso próprio Backend:", erro);
     }
   } else {
     cnpjFormatado = "⚠️ CNPJ Incompleto";
