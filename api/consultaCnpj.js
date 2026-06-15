@@ -1,20 +1,75 @@
+// FUNÇÃO AUXILIAR: Varre o HTML do site em busca de pegadas tecnológicas
+async function mapearStackTecnologico(siteUrl) {
+  if (!siteUrl) return "Sem site cadastrado";
+  
+  let url = siteUrl.toLowerCase().trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
+  }
+
+  try {
+    // Faz a requisição ao site com um limite de 4 segundos para não atrasar a busca
+    const response = await fetch(url, { 
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      signal: AbortSignal.timeout(4000)
+    });
+
+    if (!response.ok) return "Site protegido ou inacessível";
+    
+    const html = await response.text();
+    const stackDetectado = [];
+
+    // 1. Sistemas Imobiliários / CRMs
+    if (html.includes('superlogica') || html.includes('vrs.superlogica')) stackDetectado.push('Superlógica 🏠');
+    if (html.includes('kenlo') || html.includes('realsites')) stackDetectado.push('Kenlo / Ingaia 🏢');
+    if (html.includes('vista.imob') || html.includes('vistacrm')) stackDetectado.push('Vista CRM 📊');
+
+    // 2. Automação de Marketing / Vendas
+    if (html.includes('rdstation') || html.includes('rd-js')) stackDetectado.push('RD Station 🎯');
+    if (html.includes('hubspot')) stackDetectado.push('HubSpot 🚀');
+
+    // 3. Infraestrutura e Rastreamento
+    if (html.includes('wp-content') || html.includes('wp-includes')) stackDetectado.push('WordPress 🌐');
+    if (html.includes('connect.facebook.net') || html.includes('fbq(')) stackDetectado.push('Pixel Facebook 📱');
+    if (html.includes('googletagmanager.com') || html.includes('gtag(')) stackDetectado.push('Google Analytics 📈');
+
+    return stackDetectado.length > 0 ? stackDetectado.join(', ') : 'Tecnologias Básicas';
+
+  } catch (error) {
+    return "Site offline ou bloqueou a varredura";
+  }
+}
+
 export default async function handler(request, response) {
-  // Pega o CNPJ que o nosso sistema enviou pela URL
-  const { cnpj } = request.query;
+  const { cnpj, site } = request.query;
 
   if (!cnpj) {
     return response.status(400).json({ error: "Nenhum CNPJ foi fornecido." });
   }
 
   try {
-    // O Servidor da Vercel vai até a BrasilAPI consultar (Sem bloqueio de navegador!)
-    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-    const data = await res.json();
+    // 1. Consulta os dados do Governo de forma segura
+    const resGov = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`);
     
-    // Devolve os dados limpos para a nossa tela
-    return response.status(200).json(data);
+    if (!resGov.ok) {
+      return response.status(resGov.status).json({ error: "Erro ao consultar CNPJ.ws" });
+    }
+    
+    const dadosCnpj = await resGov.json();
+    
+    // 2. Executa a varredura do site em segundo plano
+    const stackTecnologico = await mapearStackTecnologico(site);
+    
+    // 3. Une os dados da Receita Federal com os dados do site e envia de volta
+    const dadosEnriquecidos = {
+      ...dadosCnpj,
+      stack_tecnologico: stackTecnologico
+    };
+
+    return response.status(200).json(dadosEnriched);
     
   } catch (error) {
-    return response.status(500).json({ error: "Erro interno ao consultar o Governo." });
+    return response.status(500).json({ error: "Erro interno no servidor da Vercel." });
   }
 }
