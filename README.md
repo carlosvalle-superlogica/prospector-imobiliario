@@ -25,3 +25,28 @@ A ferramenta atua como uma fábrica de listas prontas para o seu CRM. O fluxo op
 ---
 
 ## 📦 Estrutura do Projeto Tecnológico
+
+```text
+prospector-imobiliario/
+├── index.html                  ← Entrada principal da aplicação
+├── package.json                ← Dependências (React 18, Vite, Tailwind CSS, Lucide Icons)
+├── vite.config.js              ← Configuração de compilação rápida do Vite
+├── tailwind.config.js          ← Configurações de layout utilitário do Tailwind
+├── postcss.config.js           ← Processador de styles css
+├── public/
+│   └── clientes_hubspot.csv   ← Base de dados exportada do seu CRM para cross-check
+└── src/
+    ├── main.jsx                ← Inicialização do React
+    ├── index.css               ← Estilos globais e diretivas do Tailwind
+    ├── App.jsx                 ← Componente raiz e montagem das telas do Dashboard
+    ├── services/
+    │   └── claudeApi.js        ← Engine de comunicação, prompts estruturados e fallback de IA
+    ├── hooks/
+    │   └── useProspector.js    ← Orquestrador do Pipeline (Maps ➔ CNPJ ➔ CrossCheck CSV ➔ IA)
+    └── components/
+        ├── ui.jsx              ← Elementos reativos (Badges de Score, Spinners, Alertas)
+        ├── SearchForm.jsx      ← Filtros de localização e volumetria de leads
+        ├── ProgressBar.jsx     ← Monitor de processamento síncrono das etapas
+        ├── LeadCard.jsx        ← Card expansível de análise de inteligência do Lead
+        ├── LogPanel.jsx        ← Terminal escuro com logs das requisições em tempo real
+        └── LgpdBanner.jsx      ← Aviso de conformidade legal de dados de CNPJ públicos
