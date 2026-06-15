@@ -163,7 +163,7 @@ export default function App() {
               <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-bold text-gray-800">📋 Listagem Estruturada de Prospecção</h3>
                 <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-100">
-                  Cruzamento: Google Maps + Receita Federal + Análise de Site
+                  Cruzamento Completo: Google Maps + Receita Federal + Análise de Site
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -174,7 +174,7 @@ export default function App() {
                       <th className="p-4">Contato Oficial</th>
                       <th className="p-4">Decisor (Sócio)</th>
                       <th className="p-4">Stack Tecnológico</th>
-                      <th className="p-4">E-mail Provável</th>
+                      <th className="p-4">Canais de E-mail</th>
                       <th className="p-4 text-center">Score</th>
                       <th className="p-4">Ação SDR</th>
                     </tr>
@@ -185,7 +185,11 @@ export default function App() {
                         <td className="p-4">
                           <div className="font-bold text-gray-900">{lead.name}</div>
                           <div className="text-xs text-gray-400 mt-0.5">CNPJ: {lead.cnpj}</div>
-                          <div className="text-xs text-indigo-600 font-medium underline mt-0.5">
+                          {/* EXIBIÇÃO DA MATURIDADE DA EMPRESA */}
+                          <div className="text-[11px] font-bold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 w-fit border border-amber-100">
+                            {lead.maturidade_empresa || 'Calculando...'}
+                          </div>
+                          <div className="text-xs text-indigo-600 font-medium underline mt-1">
                             <a href={`https://${lead.site}`} target="_blank" rel="noreferrer">{lead.site}</a>
                           </div>
                         </td>
@@ -201,8 +205,14 @@ export default function App() {
                             {lead.stack_tecnologico || 'Analisando...'}
                           </span>
                         </td>
-                        <td className="p-4 font-mono text-xs text-gray-500 bg-gray-50/50">
-                          {(lead.emails_provaveis && lead.emails_provaveis[0]) || 'Não gerado'}
+                        {/* EXIBIÇÃO DOS DOIS CANAIS DE E-MAIL (DEDUZIDO + OFICIAL DA RECEITA) */}
+                        <td className="p-4 space-y-1 bg-gray-50/50">
+                          <div className="text-xs font-mono text-gray-600" title="E-mail Deduzido Comercial">
+                            🎯 {(lead.emails_provaveis && lead.emails_provaveis[0]) || 'Não gerado'}
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-400 border-t border-gray-200/60 pt-0.5" title="E-mail Oficial registrado na Receita Federal">
+                            🏛️ {lead.email_receita || 'Não disponível'}
+                          </div>
                         </td>
                         <td className="p-4 text-center">
                           <span className={`inline-block font-black text-xs px-3 py-1.5 rounded-full shadow-xs ${
