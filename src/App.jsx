@@ -173,7 +173,7 @@ export default function App() {
                   <thead>
                     <tr className="bg-gray-100/70 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
                       <th className="p-4">Empresa / CNPJ</th>
-                      <th className="p-4">Contato Geral</th>
+                      <th className="p-4">Contato Oficial</th>
                       <th className="p-4">Decisor (Sócio)</th>
                       <th className="p-4">E-mail Provável</th>
                       <th className="p-4 text-center">Score</th>
@@ -190,10 +190,14 @@ export default function App() {
                             <a href={`https://${lead.site}`} target="_blank" rel="noreferrer">{lead.site}</a>
                           </div>
                         </td>
-                        <td className="p-4 font-medium text-gray-600">{lead.phone}</td>
+                        <td className="p-4 font-medium text-gray-600">
+                          {/* Exibe os telefones formatados diretamente da API */}
+                          {lead.phone}
+                        </td>
                         <td className="p-4">
                           <div className="font-semibold text-gray-800">{(lead.socios && lead.socios[0]) || 'Diretoria'}</div>
-                          <div className="text-xs text-gray-400">Cargo: Sócio-Administrador</div>
+                          {/* Exibe o Cargo Oficial puxado da Receita Federal */}
+                          <div className="text-xs text-gray-400 font-medium">Cargo: {lead.cargo_decisor || 'Não informado'}</div>
                         </td>
                         <td className="p-4 font-mono text-xs text-gray-500 bg-gray-50/50">
                           {(lead.emails_provaveis && lead.emails_provaveis[0]) || 'Não gerado'}
