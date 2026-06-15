@@ -1,6 +1,6 @@
 // FUNÇÃO AUXILIAR: Varre o HTML do site em busca de pegadas tecnológicas
 async function mapearStackTecnologico(siteUrl) {
-  if (!siteUrl) return "Sem site cadastrado";
+  if (!siteUrl || siteUrl === "undefined") return "Sem site cadastrado";
   
   let url = siteUrl.toLowerCase().trim();
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -8,7 +8,7 @@ async function mapearStackTecnologico(siteUrl) {
   }
 
   try {
-    // Faz a requisição ao site com um limite de 4 segundos para não atrasar a busca
+    // Limite de 4 segundos para não atrasar a busca
     const response = await fetch(url, { 
       method: 'GET',
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
@@ -20,16 +20,12 @@ async function mapearStackTecnologico(siteUrl) {
     const html = await response.text();
     const stackDetectado = [];
 
-    // 1. Sistemas Imobiliários / CRMs
+    // Verificando as tecnologias
     if (html.includes('superlogica') || html.includes('vrs.superlogica')) stackDetectado.push('Superlógica 🏠');
     if (html.includes('kenlo') || html.includes('realsites')) stackDetectado.push('Kenlo / Ingaia 🏢');
     if (html.includes('vista.imob') || html.includes('vistacrm')) stackDetectado.push('Vista CRM 📊');
-
-    // 2. Automação de Marketing / Vendas
     if (html.includes('rdstation') || html.includes('rd-js')) stackDetectado.push('RD Station 🎯');
     if (html.includes('hubspot')) stackDetectado.push('HubSpot 🚀');
-
-    // 3. Infraestrutura e Rastreamento
     if (html.includes('wp-content') || html.includes('wp-includes')) stackDetectado.push('WordPress 🌐');
     if (html.includes('connect.facebook.net') || html.includes('fbq(')) stackDetectado.push('Pixel Facebook 📱');
     if (html.includes('googletagmanager.com') || html.includes('gtag(')) stackDetectado.push('Google Analytics 📈');
@@ -37,7 +33,7 @@ async function mapearStackTecnologico(siteUrl) {
     return stackDetectado.length > 0 ? stackDetectado.join(', ') : 'Tecnologias Básicas';
 
   } catch (error) {
-    return "Site offline ou bloqueou a varredura";
+    return "Site offline ou protegido";
   }
 }
 
@@ -49,7 +45,7 @@ export default async function handler(request, response) {
   }
 
   try {
-    // 1. Consulta os dados do Governo de forma segura
+    // 1. Consulta os dados na API Pública
     const resGov = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`);
     
     if (!resGov.ok) {
@@ -58,16 +54,15 @@ export default async function handler(request, response) {
     
     const dadosCnpj = await resGov.json();
     
-    // 2. Executa a varredura do site em segundo plano
+    // 2. Varredura do site 
     const stackTecnologico = await mapearStackTecnologico(site);
     
-    // 3. Une os dados da Receita Federal com os dados do site e envia de volta
+    // 3. Junta tudo na variável certa e envia
     const dadosEnriquecidos = {
       ...dadosCnpj,
       stack_tecnologico: stackTecnologico
     };
 
-    // CORRIGIDO: Agora batendo o nome correto da variável!
     return response.status(200).json(dadosEnriquecidos);
     
   } catch (error) {
