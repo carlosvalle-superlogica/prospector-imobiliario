@@ -1,6 +1,6 @@
 /**
  * SERVIÇO DE CONEXÃO E TRIANGULAÇÃO DE DADOS REAIS
- * Envia o CNPJ e o Site para o nosso Backend analisar a tecnologia!
+ * Consolida as 3 camadas de inteligência: Stack, Maturidade e Dados Fiscais Oficiais.
  */
 
 const BASE_REAL_EMPRESAS = {
@@ -35,11 +35,36 @@ const formatarTelefone = (ddd, tel) => {
   return `(${ddd}) ${limpo}`;
 };
 
+// CALCULA A IDADE COM BASE NA DATA DO CONTRATO SOCIAL DA RECEITA FEDERAL
+const calcularIdadeEmpresa = (dataAberturaString) => {
+  if (!dataAberturaString) return "Idade não mapeada";
+  try {
+    const partes = dataAberturaString.split('-');
+    const anoAbertura = parseInt(partes[0], 10);
+    const anoAtual = 2026; 
+    const idade = anoAtual - anoAbertura;
+    
+    if (idade <= 0) return "🌱 Menos de 1 ano";
+    return `🏢 ${idade} anos de mercado`;
+  } catch (e) {
+    return "Maturidade não calculada";
+  }
+};
+
+// INTEGRAÇÃO DE ABORDAGEM SDR DINÂMICA CONFORME O CARGO DETECTADO
+const gerarScriptComercialDinamico = (nomeSocio, cargo, cidade) => {
+  const socio = nomeSocio || "Responsável";
+  const local = cidade || "sua região";
+  
+  if (cargo.toLowerCase().includes('presidente') || cargo.toLowerCase().includes('diretor')) {
+    return `Olá! Procuro a assessoria direta do Sr. ${socio}. Sou especialista em otimização de repasses financeiros e redução de inadimplência para grandes carteiras de imóveis sob gestão em ${local}. Gostaria de alinhar uma breve apresentação estratégica de 10 minutos diretamente com a diretoria executiva.`;
+  }
+  return `Olá, boa tarde! O ${socio} encontra-se? É sobre uma otimização no fluxo operacional de repasses de alugueres e redução de custos operacionais na carteira de imóveis em ${local}. Conseguia transferir-me para a sala dele ou confirmar o e-mail direto?`;
+};
+
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
   await new Promise(resolve => setTimeout(resolve, 800)); 
   const listaEstado = BASE_REAL_EMPRESAS[estado] || BASE_REAL_EMPRESAS["RJ"];
-  
-  // Aqui garantimos que ele usa a variável "quantidade" corretamente
   return listaEstado.slice(0, quantidade).map(empresa => ({
     ...empresa,
     cidade: cidade ? cidade.trim() : "Região"
@@ -53,22 +78,32 @@ export async function enriquecerDadosComIA(empresa) {
   let sociosReais = ["Diretor de Operações"]; 
   let cargoDecisor = "Cargo Omitido";
   let telefonesFinais = "(00) 0000-0000"; 
-  let stackTecnico = "Aguardando varredura...";
+  let stackTecnico = "Aguardando análise...";
+  let dadosMaturidade = "Calculando...";
+  let emailOficialReceita = "Não disponível";
   let score = empresa.porte === "Grande" ? 10 : 8; 
 
   if (cnpjLimpo.length === 14) {
     try {
-      // Chama o nosso servidor passando o CNPJ e o SITE codificado com segurança
       const siteFormatado = encodeURIComponent(empresa.site || "");
       const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}&site=${siteFormatado}`);
       
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
         
-        // Recebe o stack tecnológico do backend
+        // 1. Captura as tecnologias encontradas no site
         stackTecnico = dadosCnpj.stack_tecnologico || "Tecnologias Básicas";
 
-        // Organiza os Sócios
+        // 2. Captura e processa a maturidade/idade fiscal da empresa
+        const dataAberturaRaw = dadosCnpj.estabelecimento?.data_inicio_atividade;
+        dadosMaturidade = calcularIdadeEmpresa(dataAberturaRaw);
+
+        // 3. Captura o E-mail Oficial Corporativo cadastrado na Receita Federal
+        if (dadosCnpj.estabelecimento?.email) {
+          emailOficialReceita = dadosCnpj.estabelecimento.email.toLowerCase();
+        }
+
+        // Quadro de Sócios e Cargos Reais
         if (dadosCnpj.socios && dadosCnpj.socios.length > 0) {
           sociosReais = dadosCnpj.socios.map(socio => formatarNome(socio.nome));
           cargoDecisor = formatarNome(dadosCnpj.socios[0].qualificacao_socio?.descricao) || "Sócio";
@@ -77,7 +112,7 @@ export async function enriquecerDadosComIA(empresa) {
           cargoDecisor = "Proprietário / Titular";
         }
 
-        // Organiza os Telefones
+        // Telefones Oficiais da Base Governamental
         let listaTels = [];
         const estab = dadosCnpj.estabelecimento;
         if (estab) {
@@ -90,12 +125,14 @@ export async function enriquecerDadosComIA(empresa) {
       }
     } catch (erro) {
       console.error("Erro ao comunicar com o Backend:", erro);
-      stackTecnico = "Falha de conexão com o servidor";
+      stackTecnico = "Falha no mapeamento técnico";
+      dadosMaturidade = "Erro no cálculo";
     }
   }
 
-  const justificativa = "Empresa validada. Foco em automação de repasses.";
+  const justificativa = "Empresa validada e enriquecida com cruzamento de dados fiscais.";
 
+  // Geração probabilística do e-mail do tomador de decisão (@site)
   const emailsDeduzidos = sociosReais.map(socio => {
     if (socio === "Diretor de Operações" || socio === "Diretoria") return `diretoria@${empresa.site}`;
     const nomeLimpo = socio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -105,7 +142,9 @@ export async function enriquecerDadosComIA(empresa) {
   });
 
   const principalSocio = sociosReais[0] || "Diretor Responsável";
-  const scriptSdr = `Olá, boa tarde! O ${principalSocio} se encontra? É o [Seu Nome]. É sobre uma otimização no fluxo de repasses da carteira de imóveis em ${empresa.cidade}. Consegue me confirmar o e-mail direto da diretoria?`;
+  
+  // Geração inteligente de script comercial baseado no cargo real
+  const scriptSdr = gerarScriptComercialDinamico(principalSocio, cargoDecisor, empresa.cidade);
 
   return {
     ...empresa,
@@ -113,7 +152,9 @@ export async function enriquecerDadosComIA(empresa) {
     phone: telefonesFinais,
     socios: sociosReais,
     cargo_decisor: cargoDecisor, 
-    stack_tecnologico: stackTecnico, // Variável pronta para a tela!
+    stack_tecnologico: stackTecnico,
+    maturidade_empresa: dadosMaturidade,
+    email_receita: emailOficialReceita, 
     score_potencial: score,
     justificativa_score: justificativa,
     emails_provaveis: emailsDeduzidos,
