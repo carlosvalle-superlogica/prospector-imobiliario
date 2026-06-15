@@ -6,7 +6,6 @@ export default function App() {
   const [estado, setEstado] = useState('RJ')
   const [quantidade, setQuantidade] = useState(5)
 
-  // Desestruturando as funções e estados do nosso orquestrador
   const {
     leads,
     loading,
@@ -16,7 +15,6 @@ export default function App() {
     exportarParaCsvHubspot
   } = useProspector()
 
-  // Conta quantos leads ganharam nota alta (9 ou 10) para exibir nos cards
   const leadsQualificados = leads.filter(l => l.score_potencial >= 9).length
 
   return (
@@ -175,6 +173,7 @@ export default function App() {
                       <th className="p-4">Empresa / CNPJ</th>
                       <th className="p-4">Contato Oficial</th>
                       <th className="p-4">Decisor (Sócio)</th>
+                      <th className="p-4">Stack Tecnológico</th>
                       <th className="p-4">E-mail Provável</th>
                       <th className="p-4 text-center">Score</th>
                       <th className="p-4">Ação SDR</th>
@@ -191,13 +190,17 @@ export default function App() {
                           </div>
                         </td>
                         <td className="p-4 font-medium text-gray-600">
-                          {/* Exibe os telefones formatados diretamente da API */}
                           {lead.phone}
                         </td>
                         <td className="p-4">
                           <div className="font-semibold text-gray-800">{(lead.socios && lead.socios[0]) || 'Diretoria'}</div>
-                          {/* Exibe o Cargo Oficial puxado da Receita Federal */}
                           <div className="text-xs text-gray-400 font-medium">Cargo: {lead.cargo_decisor || 'Não informado'}</div>
+                        </td>
+                        {/* NOVA COLUNA: Exibe os sistemas encontrados pelo robô de varredura */}
+                        <td className="p-4">
+                          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100/50 block w-fit max-w-[200px] truncate" title={lead.stack_tecnologico}>
+                            {lead.stack_tecnologico || 'Analisando...'}
+                          </span>
                         </td>
                         <td className="p-4 font-mono text-xs text-gray-500 bg-gray-50/50">
                           {(lead.emails_provaveis && lead.emails_provaveis[0]) || 'Não gerado'}
