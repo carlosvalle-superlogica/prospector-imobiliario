@@ -24,21 +24,22 @@ const formatarCnpjVisual = (cnpjLimpo) => {
 
 const formatarNome = (nome) => {
   if (!nome) return "";
-  return nome.split(' ').map(palavra => palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase()).join(' ');
+  return nome.split(' ').map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase()).join(' ');
 };
 
 const formatarTelefone = (ddd, tel) => {
   if (!ddd || !tel) return null;
   const limpo = String(tel).replace(/\D/g, '');
-  if (limpo.length === 8) return `Hex: (${ddd}) ${limpo.slice(0,4)}-${limpo.slice(4)}`;
+  if (limpo.length === 8) return `(${ddd}) ${limpo.slice(0,4)}-${limpo.slice(4)}`;
   if (limpo.length === 9) return `📱 (${ddd}) ${limpo.slice(0,5)}-${limpo.slice(5)}`;
   return `(${ddd}) ${limpo}`;
 };
 
 export async function buscarEmpresasFisicas(cidade, estado, quantidade) {
   await new Promise(resolve => setTimeout(resolve, 800)); 
-  // CORRIGIDO: Agora usando a variável correta 'quantidade'
   const listaEstado = BASE_REAL_EMPRESAS[estado] || BASE_REAL_EMPRESAS["RJ"];
+  
+  // Aqui garantimos que ele usa a variável "quantidade" corretamente
   return listaEstado.slice(0, quantidade).map(empresa => ({
     ...empresa,
     cidade: cidade ? cidade.trim() : "Região"
@@ -52,20 +53,22 @@ export async function enriquecerDadosComIA(empresa) {
   let sociosReais = ["Diretor de Operações"]; 
   let cargoDecisor = "Cargo Omitido";
   let telefonesFinais = "(00) 0000-0000"; 
-  let stackTecnico = "Analisando...";
+  let stackTecnico = "Aguardando varredura...";
   let score = empresa.porte === "Grande" ? 10 : 8; 
 
   if (cnpjLimpo.length === 14) {
     try {
-      // Passando o CNPJ E o SITE para o nosso servidor fazer o cruzamento
-      const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}&site=${encodeURIComponent(empresa.site)}`);
+      // Chama o nosso servidor passando o CNPJ e o SITE codificado com segurança
+      const siteFormatado = encodeURIComponent(empresa.site || "");
+      const resposta = await fetch(`/api/consultaCnpj?cnpj=${cnpjLimpo}&site=${siteFormatado}`);
       
       if (resposta.ok) {
         const dadosCnpj = await resposta.json();
         
-        // Puxa as tecnologias que o nosso robô detectou no site
-        stackTecnico = dadosCnpj.stack_tecnologico || "Apenas tecnologias básicas";
+        // Recebe o stack tecnológico do backend
+        stackTecnico = dadosCnpj.stack_tecnologico || "Tecnologias Básicas";
 
+        // Organiza os Sócios
         if (dadosCnpj.socios && dadosCnpj.socios.length > 0) {
           sociosReais = dadosCnpj.socios.map(socio => formatarNome(socio.nome));
           cargoDecisor = formatarNome(dadosCnpj.socios[0].qualificacao_socio?.descricao) || "Sócio";
@@ -74,6 +77,7 @@ export async function enriquecerDadosComIA(empresa) {
           cargoDecisor = "Proprietário / Titular";
         }
 
+        // Organiza os Telefones
         let listaTels = [];
         const estab = dadosCnpj.estabelecimento;
         if (estab) {
@@ -86,7 +90,7 @@ export async function enriquecerDadosComIA(empresa) {
       }
     } catch (erro) {
       console.error("Erro ao comunicar com o Backend:", erro);
-      stackTecnico = "Falha no mapeamento técnico";
+      stackTecnico = "Falha de conexão com o servidor";
     }
   }
 
@@ -109,7 +113,7 @@ export async function enriquecerDadosComIA(empresa) {
     phone: telefonesFinais,
     socios: sociosReais,
     cargo_decisor: cargoDecisor, 
-    stack_tecnologico: stackTecnico,
+    stack_tecnologico: stackTecnico, // Variável pronta para a tela!
     score_potencial: score,
     justificativa_score: justificativa,
     emails_provaveis: emailsDeduzidos,
