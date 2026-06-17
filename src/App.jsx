@@ -16,6 +16,9 @@ export default function App() {
   } = useProspector()
 
   const leadsQualificados = leads.filter(l => l.score_potencial >= 9).length
+  
+  // Lista completa de estados para o seletor dinâmico
+  const estadosBrasil = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -67,8 +70,9 @@ export default function App() {
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
               >
-                <option value="RJ">Rio de Janeiro (RJ)</option>
-                <option value="SP">São Paulo (SP)</option>
+                {estadosBrasil.map((uf) => (
+                  <option key={uf} value={uf}>{uf}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -185,7 +189,6 @@ export default function App() {
                         <td className="p-4">
                           <div className="font-bold text-gray-900">{lead.name}</div>
                           <div className="text-xs text-gray-400 mt-0.5">CNPJ: {lead.cnpj}</div>
-                          {/* EXIBIÇÃO DA MATURIDADE DA EMPRESA */}
                           <div className="text-[11px] font-bold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 w-fit border border-amber-100">
                             {lead.maturidade_empresa || 'Calculando...'}
                           </div>
@@ -193,9 +196,7 @@ export default function App() {
                             <a href={`https://${lead.site}`} target="_blank" rel="noreferrer">{lead.site}</a>
                           </div>
                         </td>
-                        <td className="p-4 font-medium text-gray-600">
-                          {lead.phone}
-                        </td>
+                        <td className="p-4 font-medium text-gray-600">{lead.phone}</td>
                         <td className="p-4">
                           <div className="font-semibold text-gray-800">{(lead.socios && lead.socios[0]) || 'Diretoria'}</div>
                           <div className="text-xs text-gray-400 font-medium">Cargo: {lead.cargo_decisor || 'Não informado'}</div>
@@ -205,7 +206,6 @@ export default function App() {
                             {lead.stack_tecnologico || 'Analisando...'}
                           </span>
                         </td>
-                        {/* EXIBIÇÃO DOS DOIS CANAIS DE E-MAIL (DEDUZIDO + OFICIAL DA RECEITA) */}
                         <td className="p-4 space-y-1 bg-gray-50/50">
                           <div className="text-xs font-mono text-gray-600" title="E-mail Deduzido Comercial">
                             🎯 {(lead.emails_provaveis && lead.emails_provaveis[0]) || 'Não gerado'}
