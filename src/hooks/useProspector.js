@@ -12,7 +12,6 @@ export function useProspector() {
     setLogs((prev) => [...prev, `[${timestamp}] ${mensagem}`])
   }
 
-  // Pipeline principal que lê o CSV diretamente da pasta public através do navegador
   const iniciarProspecction = async (cidade, estado, quantidade) => {
     if (!cidade) {
       alert('Por favor, digite uma cidade para iniciar.')
@@ -25,18 +24,15 @@ export function useProspector() {
     
     const limite = parseInt(quantidade) || 5;
     const uf = estado ? estado.toUpperCase().trim() : "DF";
-    
-    // Transforma "Brasília" em "BRASILIA" limpando acentos e espaços nas pontas
     const termoProcurado = cidade.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
     setProgresso({ atual: 0, total: limite, mensagem: 'Iniciando motores...' })
     adicionarLog(`🚀 Procurando leads reais no arquivo da pasta public/${uf}.csv (Meta: ${limite} leads)`)
 
     try {
-      setProgresso(p => ({ ...p, mensagem: `A carregar base de dados de ${uf}...` }))
+      setProgresso(p => ({ ...p, mensagem: `Lendo base de dados de ${uf}...` }))
       adicionarLog(`🌐 Abrindo base de dados local... Varrendo imobiliárias em ${cidade}...`)
 
-      // Procura o arquivo na raiz da pasta public através do navegador
       const respostaCsv = await fetch(`./${uf}.csv`);
       
       if (!respostaCsv.ok) {
@@ -50,43 +46,66 @@ export function useProspector() {
         throw new Error("O arquivo CSV está vazio ou mal formatado.");
       }
 
-      // Mapeia o cabeçalho removendo espaços e aspas nas pontas das palavras
-      const cabecalho = linhas[0].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      // Detecta se o separador é ponto e vírgula (comum no Brasil) ou vírgula
+      const primeiraLinha = linhas[0];
+      const separador = primeiraLinha.includes(';') ? ';' : ',';
       
+      // Limpa aspas e espaços do cabeçalho
+      const cabecalho = primeiraLinha.split(separador).map(c => c.replace(/^"|"$/g, '').trim());
+      
+      // Mapeamento com base EXATA no seu cabeçalho fornecido
       const campoNome     = cabecalho.indexOf('Razão Social');
       const campoCnpj     = cabecalho.indexOf('CNPJ');
       const campoCidade   = cabecalho.indexOf('Município');
       const campoSocios   = cabecalho.indexOf('Quadro Societário');
       const campoEmail    = cabecalho.indexOf('E-MAIL');
-      const campoTelefone = cabecalho.indexOf('Telefone');
+      
+      // Usa "Telefone OK" se existir, senão tenta "Telefone"
+      let campoTelefone = cabecalho.indexOf('Telefone OK');
+      if (campoTelefone === -1) campoTelefone = cabecalho.indexOf('Telefone');
 
       const empresasEncontradas = [];
-      // Expressão regular para quebrar colunas por vírgula mas ignorar vírgulas dentro de aspas
-      const regexValores = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
 
-      // Percorre o CSV procurando as linhas correspondentes à cidade digitada
+      // Percorre o CSV procurando as linhas correspondentes
       for (let i = 1; i < linhas.length; i++) {
         if (!linhas[i].trim()) continue;
 
-        const colunas = linhas[i].split(regexValores).map(c => c.replace(/^"|"$/g, '').trim());
+        // Quebra as colunas respeitando o separador detectado
+        let colunas = [];
+        if (separador === ';') {
+          colunas = linhas[i].split(';').map(c => c.replace(/^"|"$/g, '').trim());
+        } else {
+          const regexValores = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+          colunas = linhas[i].split(regexValores).map(c => c.replace(/^"|"$/g, '').trim());
+        }
+
         const cidadeLinha = colunas[campoCidade] ? colunas[campoCidade].toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
 
         if (cidadeLinha.includes(termoProcurado)) {
-          let socioPrincipal = "Diretoria";
-          if (colunas[campoSocios]) {
-            socioPrincipal = colunas[campoSocios].split('-')[0].split(';')[0].trim();
+          
+          // Extrai o nome do sócio de forma limpa se ele existir no Quadro Societário
+          let socioPrincipal = "Diretor Omitido";
+          if (colunas[campoSocios] && colunas[campoSocios].trim() !== "" && colunas[campoSocios] !== "N/A") {
+            // Limpa formatos comuns como "22-SÓCIO" ou separações por ponto e vírgula
+            socioPrincipal = colunas[campoSocios].split('-')[0].split(';')[0].replace(/[^a-zA-Z\s]/g, '').trim();
           }
 
           const nomeEmpresa = colunas[campoNome] || "Empresa Encontrada";
           const nomeLimpoParaSite = nomeEmpresa.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+          
+          // Pega o e-mail real do CSV
+          const emailReal = colunas[campoEmail] && colunas[campoEmail].trim() !== "" ? colunas[campoEmail] : "";
+          
+          // Pega o telefone real do CSV
+          const telefoneReal = colunas[campoTelefone] && colunas[campoTelefone].trim() !== "" ? colunas[campoTelefone] : "Não disponível";
 
           empresasEncontradas.push({
             name: nomeEmpresa,
             cnpj: colunas[campoCnpj] || "N/A",
-            phone: colunas[campoTelefone] || "Não disponível",
+            phone: telefoneReal,
             socios: [socioPrincipal],
-            email_receita: colunas[campoEmail] || "Não disponível",
-            emails_provaveis: [colunas[campoEmail] || ""], // Garante a compatibilidade com a exportação
+            email_receita: emailReal || "Não disponível",
+            emails_provaveis: [emailReal], 
             site: nomeLimpoParaSite ? `${nomeLimpoParaSite}.com.br` : "consultar.com.br",
             script_abordagem: "Carregando análise estratégica...",
             score_potencial: 10
@@ -100,7 +119,6 @@ export function useProspector() {
 
       const listaEnriquecida = [];
 
-      // Processa a lista final enviando ou simulando a IA
       for (let i = 0; i < empresasEncontradas.length; i++) {
         const empresaAtual = empresasEncontradas[i];
         const numeroAtual = i + 1;
@@ -111,11 +129,12 @@ export function useProspector() {
           mensagem: `Enriquecendo dados: Empresa ${numeroAtual} de ${empresasEncontradas.length}...`
         });
         
-        adicionarLog(`🧠 Analisando dados de: "${empresaAtual.name}"...`);
+        adicionarLog(`🧠 Analisando dados reais de: "${empresaAtual.name}"...`);
         
         let empresaCompleta = empresaAtual;
         try {
           if (typeof enriquecerDadosComIA === 'function') {
+            // A IA recebe os dados REAIS do CSV (com o e-mail e telefone certos) para trabalhar em cima
             empresaCompleta = await enriquecerDadosComIA(empresaAtual);
           }
         } catch (e) {
@@ -135,7 +154,7 @@ export function useProspector() {
       }
 
       setProgresso(p => ({ ...p, mensagem: 'Concluído com sucesso!' }));
-      adicionarLog(`🎉 Feito! Lista de prospecção gerada a partir do seu CSV e pronta para o HubSpot.`);
+      adicionarLog(`🎉 Feito! Lista de prospecção gerada com dados extraídos com sucesso.`);
 
     } catch (error) {
       adicionarLog(`❌ Erro no Pipeline: ${error.message}`);
@@ -145,7 +164,6 @@ export function useProspector() {
     }
   }
 
-  // Função para exportar os dados capturados da tabela de volta para o formato HubSpot
   const exportarParaCsvHubspot = () => {
     if (leads.length === 0) return
 
