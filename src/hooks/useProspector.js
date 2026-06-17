@@ -12,7 +12,7 @@ export function useProspector() {
     setLogs((prev) => [...prev, `[${timestamp}] ${mensagem}`])
   }
 
-  // Pipeline principal ajustado para ler o CSV local direto do navegador
+  // Pipeline principal que lê o CSV diretamente da pasta public através do navegador
   const iniciarProspecction = async (cidade, estado, quantidade) => {
     if (!cidade) {
       alert('Por favor, digite uma cidade para iniciar.')
@@ -26,18 +26,18 @@ export function useProspector() {
     const limite = parseInt(quantidade) || 5;
     const uf = estado ? estado.toUpperCase().trim() : "DF";
     
-    // Remove acentos e espaços extras para não dar erro na comparação
+    // Transforma "Brasília" em "BRASILIA" limpando acentos e espaços nas pontas
     const termoProcurado = cidade.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
     setProgresso({ atual: 0, total: limite, mensagem: 'Iniciando motores...' })
     adicionarLog(`🚀 Procurando leads reais no arquivo da pasta public/${uf}.csv (Meta: ${limite} leads)`)
 
     try {
-      setProgresso(p => ({ ...p, mensagem: `Buscando arquivo ${uf}.csv...` }))
+      setProgresso(p => ({ ...p, mensagem: `A carregar base de dados de ${uf}...` }))
       adicionarLog(`🌐 Abrindo base de dados local... Varrendo imobiliárias em ${cidade}...`)
 
-      // Busca o arquivo CSV direto na pasta public
-      const respostaCsv = await fetch(`/${uf}.csv`);
+      // Procura o arquivo na raiz da pasta public através do navegador
+      const respostaCsv = await fetch(`./${uf}.csv`);
       
       if (!respostaCsv.ok) {
         throw new Error(`O arquivo ${uf}.csv não foi encontrado na pasta public do seu projeto.`);
@@ -50,7 +50,7 @@ export function useProspector() {
         throw new Error("O arquivo CSV está vazio ou mal formatado.");
       }
 
-      // Mapeia o cabeçalho limpando espaços e aspas
+      // Mapeia o cabeçalho removendo espaços e aspas nas pontas das palavras
       const cabecalho = linhas[0].split(',').map(c => c.replace(/^"|"$/g, '').trim());
       
       const campoNome     = cabecalho.indexOf('Razão Social');
@@ -61,9 +61,10 @@ export function useProspector() {
       const campoTelefone = cabecalho.indexOf('Telefone');
 
       const empresasEncontradas = [];
+      // Expressão regular para quebrar colunas por vírgula mas ignorar vírgulas dentro de aspas
       const regexValores = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
 
-      // Varre o arquivo CSV em busca da cidade digitada
+      // Percorre o CSV procurando as linhas correspondentes à cidade digitada
       for (let i = 1; i < linhas.length; i++) {
         if (!linhas[i].trim()) continue;
 
@@ -85,7 +86,7 @@ export function useProspector() {
             phone: colunas[campoTelefone] || "Não disponível",
             socios: [socioPrincipal],
             email_receita: colunas[campoEmail] || "Não disponível",
-            emails_provaveis: [colunas[campoEmail] || ""], // Mantém compatibilidade com o exportador do HubSpot
+            emails_provaveis: [colunas[campoEmail] || ""], // Garante a compatibilidade com a exportação
             site: nomeLimpoParaSite ? `${nomeLimpoParaSite}.com.br` : "consultar.com.br",
             script_abordagem: "Carregando análise estratégica...",
             score_potencial: 10
@@ -95,11 +96,11 @@ export function useProspector() {
         }
       }
 
-      adicionarLog(`✅ Sucesso: ${empresasEncontradas.length} imobiliárias reais localizadas no seu arquivo CSV.`);
+      adicionarLog(`✅ Sucesso: ${empresasEncontradas.length} imobiliárias reais localizadas no arquivo CSV.`);
 
       const listaEnriquecida = [];
 
-      // Passa as empresas encontradas pela Inteligência Artificial
+      // Processa a lista final enviando ou simulando a IA
       for (let i = 0; i < empresasEncontradas.length; i++) {
         const empresaAtual = empresasEncontradas[i];
         const numeroAtual = i + 1;
@@ -118,7 +119,7 @@ export function useProspector() {
             empresaCompleta = await enriquecerDadosComIA(empresaAtual);
           }
         } catch (e) {
-          adicionarLog(`⚠️ Aviso: Usando dados diretos do CSV para esta linha.`);
+          adicionarLog(`⚠️ Aviso: Mantendo dados originais do CSV para esta linha.`);
         }
 
         const empresaComCrm = {
@@ -133,7 +134,7 @@ export function useProspector() {
         adicionarLog(`⭐ Lead Concluído! "${empresaComCrm.name}" pronto na tabela.`);
       }
 
-      setProgresso(p => ({ ...p, message: 'Concluído com sucesso!' }));
+      setProgresso(p => ({ ...p, mensagem: 'Concluído com sucesso!' }));
       adicionarLog(`🎉 Feito! Lista de prospecção gerada a partir do seu CSV e pronta para o HubSpot.`);
 
     } catch (error) {
@@ -144,6 +145,7 @@ export function useProspector() {
     }
   }
 
+  // Função para exportar os dados capturados da tabela de volta para o formato HubSpot
   const exportarParaCsvHubspot = () => {
     if (leads.length === 0) return
 
